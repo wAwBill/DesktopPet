@@ -1,6 +1,6 @@
 {
   "_说明": "repo 填 GitHub 的 owner/repo（例如 wAwBill/DesktopPet）；为空时程序跳过自动更新检查。这是 exe 旁边的外置文件，改它不需要重新打包。",
-  "repo": "",
+  "repo": "wAwBill/DesktopPet",
   "enabled": true,
   "check_on_start": true,
   "start_delay_sec": 8

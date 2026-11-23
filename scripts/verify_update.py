@@ -42,6 +42,14 @@ def make_env(tmp):
     for p in glob.glob(os.path.join(ROOT, "dialogues*.txt")):
         shutil.copy2(p, os.path.join(tmp, os.path.basename(p)))
     shutil.copytree(os.path.join(ROOT, "assets"), os.path.join(tmp, "assets"))
+    # 测试环境固定为「未配置更新源」，不依赖工程里实际配置的正式仓库
+    with open(os.path.join(tmp, "update.json"), "w", encoding="utf-8") as f:
+        json.dump(dict(up_settings_empty()), f, ensure_ascii=False, indent=2)
+
+
+def up_settings_empty():
+    return {"repo": "", "enabled": True, "check_on_start": True,
+            "start_delay_sec": 8}
 
 
 def menu_labels(menu):
@@ -138,6 +146,17 @@ def main():
               up_mod.should_skip_automatic_check() is True)
 
         # ---------------- 配置与地址
+        with open(os.path.join(ROOT, "update.json"), encoding="utf-8-sig") as f:
+            live = json.load(f)
+        check("工程 update.json 已配置正式更新源",
+              live.get("repo") == "wAwBill/DesktopPet", str(live.get("repo")))
+        zpath = os.path.join(ROOT, "publish", "DesktopPet.zip")
+        if os.path.isfile(zpath):
+            with zipfile.ZipFile(zpath) as z:
+                pkg = json.loads(z.read("update.json").decode("utf-8-sig"))
+            check("发布包 update.json 已写入正式更新源",
+                  pkg.get("repo") == "wAwBill/DesktopPet", str(pkg.get("repo")))
+
         settings = up_mod.load_settings(tmp)
         check("默认 update.json 的 repo 为空（跳过检查）",
               settings.get("repo") == "" and settings.get("enabled") is True)

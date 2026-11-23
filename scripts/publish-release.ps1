@@ -63,6 +63,10 @@ if ([string]::IsNullOrWhiteSpace($Repo)) {
     $umeta = Read-JsonFile (Join-Path $root "update.json")
     $Repo = [string]$umeta.repo
 }
+# 发布包必须带正式更新源，否则新用户解压后 repo 为空，自动更新会静默失效
+if ([string]::IsNullOrWhiteSpace($Repo) -or $Repo -notmatch '^[\w.-]+/[\w.-]+$') {
+    throw "发版必须指定更新源仓库（-Repo owner/repo，或 update.json 的 repo）"
+}
 
 # ---- 输出目录
 if ([string]::IsNullOrWhiteSpace($OutDir)) { $OutDir = Join-Path $root "publish" }
@@ -114,6 +118,13 @@ foreach ($f in @("version.json", "update.json", "updater.py", "README.md")) {
     }
 }
 
+# 发布包必须自带正式更新源：新用户解压后自动更新才会生效。
+# 以 -Repo 参数为准，不依赖源文件里恰好填了什么。
+$stagedUpdate = Join-Path $StageDir "update.json"
+$u = Read-JsonFile $stagedUpdate
+$u.repo = $Repo
+$u | ConvertTo-Json -Depth 4 | Set-Content -Path $stagedUpdate -Encoding UTF8
+
 # 打包前校验：主程序必须在，用户数据不能带真实值
 $must = @("小仓鼠桌宠.exe", "pet.py", "boat_fx.py", "updater.py",
           "version.json", "update.json", "config.json", "pets.json",
@@ -123,6 +134,8 @@ foreach ($f in $must) {
 }
 $stagedVersion = (Read-JsonFile (Join-Path $StageDir "version.json")).version
 if ([string]$stagedVersion -ne $Version) { throw "发布包内版本号 $stagedVersion 与 $Version 不一致" }
+$stagedRepo = [string](Read-JsonFile $stagedUpdate).repo
+if ($stagedRepo -ne $Repo) { throw "发布包内更新源 $stagedRepo 与 $Repo 不一致" }
 
 # ---- 生成 zip（文件名必须英文，否则 GitHub 会收成 default.zip）
 $zipPath = Join-Path $OutDir $zipName

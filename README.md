@@ -72,8 +72,10 @@ python scripts/build.py . --name 小仓鼠桌宠 --out ../dist_小仓鼠桌宠
 5. Actions 变绿后，在 Release 里确认 `DesktopPet.zip` 与 `latest.json`。
 6. 发版成功后清空 `本版更新说明.txt` 并 push，避免下版说明堆积。
 
-## 首次部署待办
+## 更新源配置
 
-> ⚠️ `update.json` 的 `repo` 目前为空，程序会跳过自动更新检查（不会报错）。
-> 在 GitHub 建好空仓库后，把 `owner/repo` 填进 `update.json` 即可生效；
-> 该文件在 exe 旁边，**不需要重新打包 exe**。
+> `update.json` 的 `repo` 已配置为 `wAwBill/DesktopPet`，程序启动 8 秒后
+> 自动检查更新（右键菜单也可手动「检查更新」）。把 `repo` 留空即可跳过
+> 自动更新检查（不会报错）；该文件在 exe 旁边，**改它不需要重新打包 exe**。
+> 发布脚本会把 `-Repo` 参数写进发布包的 `update.json`，因此下载安装的新用户
+> 也能直接收到后续更新。
