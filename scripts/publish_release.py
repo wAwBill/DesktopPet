@@ -151,6 +151,13 @@ def main():
 
 
 if __name__ == "__main__":
+    # CI 是英文 Windows，控制台代码页可能与本机不同；统一成 UTF-8，
+    # 避免打印中文摘要/异常时抛 UnicodeEncodeError 把成功误判为失败。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     try:
         main()
     except Exception as exc:

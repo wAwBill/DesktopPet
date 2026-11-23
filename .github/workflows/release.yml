@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
 jobs:
   publish:
     runs-on: windows-latest
@@ -31,7 +35,32 @@ jobs:
         run: |
           python scripts/publish_release.py \
             --version "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}"
+            --repo "${{ github.repository }}" 2>&1 | tee "$RUNNER_TEMP/pet-build.log"
+          exit "${PIPESTATUS[0]}"
+
+      # 失败时把云端环境与完整构建日志回写到 ci-debug 分支，便于本机排查。
+      - name: Collect build diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p ci-debug
+          {
+            echo "RUN_ID=$GITHUB_RUN_ID  SHA=$GITHUB_SHA"
+            echo "=== python ==="
+            python --version 2>&1 || true
+            python -c "import sys, PyInstaller, tkinter; print(sys.executable, sys.stdout.encoding, PyInstaller.__version__)" 2>&1 || true
+            echo "=== root ==="
+            ls -la 2>&1 || true
+            echo "=== publish ==="
+            ls -laR publish 2>&1 || true
+            echo "=== BUILD LOG ==="
+            cat "$RUNNER_TEMP/pet-build.log" 2>&1 || true
+          } > ci-debug/diagnostics.txt 2>&1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f ci-debug/diagnostics.txt
+          git commit -m "CI diagnostics $GITHUB_RUN_ID" || true
+          git push origin HEAD:ci-debug || true
 
       - name: Create GitHub Release
         env:
