@@ -1,0 +1,29 @@
+# 本机运行数据（含用户设置、面板位置、喝水记录）——不入库
+state.json
+
+# 构建中间产物与发布产物
+_dist/
+_build/
+_spec/
+build/
+dist/
+publish/
+*.spec
+*.zip
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 生成稿与调试图（体积大、只在本机用）
+生成稿/
+_verify_out/
+
+# 编辑器 / 系统
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

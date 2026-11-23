@@ -1,0 +1,8 @@
+# 运行桌宠（源码方式）所需的第三方依赖
+# 打包 exe 时 PyInstaller 会自动收集这些模块；CI 也按此文件安装。
+Pillow>=10.0
+pystray>=0.19
+psutil>=5.9
+
+# 仅用于发版打包，CI 里安装
+pyinstaller>=6.0

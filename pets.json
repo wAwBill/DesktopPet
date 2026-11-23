@@ -1,0 +1,41 @@
+{
+  "_说明": "切换宠物列表。每一项就是一个「形象」，同一个角色可以有多个形象。添加新形象：把透明底 PNG 放进 assets/，再照下面复制一条改 id/name/image 即可，不用改代码、不用重新打包。image/dialogues/frames 都用相对路径、正斜杠。",
+  "_字段": "id=唯一标识, name=菜单显示名, image=形象图, dialogues=该形象的文案文件, greeting=切换时的开场白, height_px=可选(单独指定高度), frames=可选(该形象专属动作帧目录), fx=可选(填 boat 启用水浪/船桨巡逻特效)",
+  "active": "luoxiaohei_3d",
+  "pets": [
+    {
+      "id": "hamster",
+      "name": "小仓鼠",
+      "image": "assets/pet.png",
+      "dialogues": "dialogues.txt",
+      "greeting": "哼，你们惹毛我了！",
+      "frames": ""
+    },
+    {
+      "id": "luoxiaohei",
+      "name": "罗小黑",
+      "image": "assets/luoxiaohei.png",
+      "dialogues": "dialogues_luoxiaohei.txt",
+      "greeting": "……（看了你一眼）",
+      "frames": ""
+    },
+    {
+      "id": "luoxiaohei_3d",
+      "name": "罗小黑 · 3D 版",
+      "image": "assets/luoxiaohei_3d.png",
+      "dialogues": "dialogues_luoxiaohei.txt",
+      "greeting": "……（毛茸茸地眨了眨眼）",
+      "frames": ""
+    },
+    {
+      "id": "luoxiaohei_boat",
+      "name": "罗小黑 · 划船巡逻",
+      "image": "assets/luoxiaohei_boat.png",
+      "dialogues": "dialogues_luoxiaohei.txt",
+      "greeting": "……出发，去巡逻啦",
+      "frames": "",
+      "fx": "boat",
+      "height_px": 220
+    }
+  ]
+}

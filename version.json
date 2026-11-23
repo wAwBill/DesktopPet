@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "name": "小仓鼠桌宠",
+  "exe": "小仓鼠桌宠.exe",
+  "zip": "DesktopPet.zip",
+  "_说明": "唯一版本源。发版时只改这里的 version，并打同名 tag vX.Y.Z；Actions 会校验两者一致。"
+}
