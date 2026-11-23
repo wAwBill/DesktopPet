@@ -33,7 +33,27 @@ jobs:
 
       - name: Build release package
         shell: pwsh
-        run: ./scripts/publish-release.ps1 -Version "${{ github.ref_name }}" -Repo "${{ github.repository }}"
+        run: |
+          # GitHub 托管的 pwsh 7 与本机 PS 5.1 行为不同：显式放开执行策略，
+          # 并把 PyInstaller 的 stderr 收进日志，避免被包装脚本误判为失败。
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $log = Join-Path $env:RUNNER_TEMP "pet-build.log"
+          & ./scripts/publish-release.ps1 -Version "${{ github.ref_name }}" -Repo "${{ github.repository }}" *> $log
+          $code = $LASTEXITCODE
+          Get-Content $log -Tail 80
+          if ($code -ne 0) {
+            $errs = @(Get-Content $log | Where-Object {
+              $_ -match 'Exception|throw|cannot|not found|找不到|失败|error|错误'
+            } | Select-Object -Last 6)
+            foreach ($e in $errs) {
+              $msg = ([string]$e) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'
+              Write-Host "::error::$msg"
+            }
+            Write-Host "::error::发布脚本退出码 $code"
+            exit $code
+          }
 
       - name: Verify package contents
         shell: pwsh

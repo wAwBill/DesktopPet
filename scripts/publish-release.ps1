@@ -82,10 +82,16 @@ if (-not $SkipBuild) {
     # 包成 ErrorRecord，配合 Stop 会误判为失败。调用期间临时降级为 Continue。
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    & $Python (Join-Path $root "scripts\build.py") $root --name "小仓鼠桌宠" --out $StageDir
+    # pwsh 7.4+ 默认会把原生命令的 stderr 与 $ErrorActionPreference 联动；
+    # 显式关掉并把输出管道到 Host，避免进度日志被当成致命错误。
+    $PSNativeCommandUseErrorActionPreference = $false
+    & $Python (Join-Path $root "scripts\build.py") $root --name "小仓鼠桌宠" --out $StageDir 2>&1 |
+        ForEach-Object { Write-Host $_ }
     $buildExit = $LASTEXITCODE
     $ErrorActionPreference = $prevEap
-    if ($buildExit -ne 0) { throw "PyInstaller 打包失败（解释器：$Python）" }
+    if ($buildExit -ne 0) {
+        throw "PyInstaller 打包失败（解释器：$Python，退出码 $buildExit）"
+    }
 } elseif (-not (Test-Path (Join-Path $StageDir "小仓鼠桌宠.exe"))) {
     throw "-SkipBuild 需要 $StageDir 里已有打包好的 exe"
 }
