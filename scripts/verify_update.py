@@ -161,7 +161,7 @@ def main():
         check("默认 update.json 的 repo 为空（跳过检查）",
               settings.get("repo") == "" and settings.get("enabled") is True)
         check("version.json 是唯一版本源",
-              up_mod.load_version(tmp) == "1.0.0",
+              up_mod.load_version(tmp) == "1.1.0",
               up_mod.load_version(tmp))
         up0 = up_mod.Updater(tmp, repo="", local_version="1.0.0")
         check("repo 为空时 manifest_url 为 None",
@@ -353,10 +353,10 @@ def main():
         app.say = lambda text, *a, **k: said.append(text)
         labels = menu_labels(app.menu)
         check("菜单含「检查更新（当前版本）」",
-              any(s.startswith("检查更新（当前 v1.0.0）") for s in labels),
+              any(s.startswith("检查更新（当前 v1.1.0）") for s in labels),
               next((s for s in labels if s.startswith("检查更新")), ""))
         check("实例已加载版本号与更新器",
-              app.app_version == "1.0.0" and app._updater is not None)
+              app.app_version == "1.1.0" and app._updater is not None)
         check("未配置 repo 时手动检查只提示、不联网",
               (app._manual_update_check() or True)
               and any("尚未配置更新仓库" in s for s in said), str(said[-1:]))

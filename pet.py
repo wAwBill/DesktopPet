@@ -303,6 +303,22 @@ def time_pool_name(hour):
     return "night"
 
 
+def normalize_offwork_time(text):
+    """把「18:00」「18：00」收成 HH:MM。不合法返回 None。"""
+    raw = str(text or "").strip().replace("：", ":")
+    parts = raw.split(":")
+    if len(parts) != 2:
+        return None
+    try:
+        hh = int(parts[0].strip())
+        mm = int(parts[1].strip())
+    except ValueError:
+        return None
+    if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+        return None
+    return "%02d:%02d" % (hh, mm)
+
+
 # ---------------------------------------------------------------- Windows 小工具
 def win_set_dpi_aware():
     if IS_WIN:
@@ -1077,6 +1093,8 @@ class DesktopPet:
             comp.add_checkbutton(label=label, variable=v,
                                  command=lambda k=key: self._toggle_comp(k))
         m.add_cascade(label="组件开关", menu=comp)
+        clock = normalize_offwork_time(self.cfg.get("offwork_time", "18:00")) or "18:00"
+        m.add_command(label="下班时间（%s）…" % clock, command=self._offwork_dialog)
 
         # 天气与位置：手动城市 / 按网络 IP 自动定位 / 立即刷新
         loc, label = self._weather_location()
@@ -1374,13 +1392,62 @@ class DesktopPet:
     def _offwork_text(self, now):
         if now.weekday() >= 5:
             return "今天不上班 ✨"
-        hh, mm = self.cfg.get("offwork_time", "18:00").split(":")
-        target = now.replace(hour=int(hh), minute=int(mm), second=0)
+        clock = normalize_offwork_time(self.cfg.get("offwork_time", "18:00")) or "18:00"
+        hh, mm = clock.split(":")
+        target = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
         if now >= target:
             return "已下班，自由啦！"
         left = target - now
-        h, r = divmod(left.seconds, 3600)
+        h, r = divmod(int(left.total_seconds()), 3600)
         return "距下班 %d:%02d" % (h, r // 60)
+
+    def _offwork_dialog(self):
+        """改下班时间：立刻写入 config.json，面板马上按新时间倒计时。"""
+        top = tk.Toplevel(self.root)
+        top.title("设置下班时间")
+        top.attributes("-topmost", True)
+        top.resizable(False, False)
+        tk.Label(top, text="下班时间（24 小时制，如 18:00、9:30）",
+                 padx=12, pady=6).pack()
+        current = normalize_offwork_time(self.cfg.get("offwork_time", "18:00")) or "18:00"
+        e = tk.Entry(top, width=16, justify="center")
+        e.insert(0, current)
+        e.pack(padx=12, pady=4)
+        e.focus_set()
+        e.select_range(0, "end")
+        hint = tk.Label(top, fg="#888888", padx=12,
+                        text="保存后立刻生效，不用重启。周末仍显示「今天不上班」。")
+        hint.pack()
+
+        def ok():
+            clock = normalize_offwork_time(e.get())
+            if clock is None:
+                hint.configure(fg="#c04040", text="请填 0:00 到 23:59，例如 18:30")
+                return
+            self.cfg["offwork_time"] = clock
+            save_json(CONFIG_PATH, self.cfg)
+            # 新时间还没到的话，允许今天再庆祝一次，避免改完时间不再到点提醒
+            now = datetime.now()
+            target = now.replace(hour=int(clock[:2]), minute=int(clock[3:]),
+                                 second=0, microsecond=0)
+            if now < target and self.state.get("celebrated_offwork") == date.today().isoformat():
+                self.state["celebrated_offwork"] = ""
+                self._save_state()
+            top.destroy()
+            self._update_panel()
+            self.say("下班时间改成 %s 啦" % clock, duration=3000)
+
+        bar = tk.Frame(top)
+        bar.pack(pady=8)
+        tk.Button(bar, text="保存", width=8, command=ok).pack(side="left", padx=6)
+        tk.Button(bar, text="取消", width=8,
+                  command=top.destroy).pack(side="left", padx=6)
+        top.bind("<Return>", lambda _e: ok())
+        top.bind("<Escape>", lambda _e: top.destroy())
+        top.update_idletasks()
+        sw, sh = top.winfo_screenwidth(), top.winfo_screenheight()
+        top.geometry("+%d+%d" % ((sw - top.winfo_width()) // 2,
+                                 (sh - top.winfo_height()) // 3))
 
     def _water_add(self):
         self.state["water"] = int(self.state.get("water", 0)) + 1
