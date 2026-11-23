@@ -18,7 +18,7 @@
 | `version.json` | **唯一版本源**，发版只改这里 |
 | `update.json` | 更新源配置（`repo` 填 GitHub 仓库，外置可改） |
 | `scripts/build.py` | 本地打包 exe |
-| `scripts/publish-release.ps1` | 生成发布 zip 与 `latest.json` |
+| `scripts/publish_release.py` | 生成发布 zip 与 `latest.json`（CI 与本机共用，纯 Python） |
 | `scripts/verify_*.py` | 各功能的离线专项验证 |
 | `.github/workflows/release.yml` | tag 触发的自动发版流水线 |
 | `Docs/发布/` | 发版流程与本版更新说明 |
@@ -77,5 +77,5 @@ python scripts/build.py . --name 小仓鼠桌宠 --out ../dist_小仓鼠桌宠
 > `update.json` 的 `repo` 已配置为 `wAwBill/DesktopPet`，程序启动 8 秒后
 > 自动检查更新（右键菜单也可手动「检查更新」）。把 `repo` 留空即可跳过
 > 自动更新检查（不会报错）；该文件在 exe 旁边，**改它不需要重新打包 exe**。
-> 发布脚本会把 `-Repo` 参数写进发布包的 `update.json`，因此下载安装的新用户
+> 发布脚本会把 `--repo` 参数写进发布包的 `update.json`，因此下载安装的新用户
 > 也能直接收到后续更新。
