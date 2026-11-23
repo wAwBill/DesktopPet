@@ -32,26 +32,32 @@ jobs:
           Write-Host "版本校验通过: $v"
 
       - name: Build release package
-        shell: pwsh
+        # 用 Windows PowerShell 5.1：与本机演练环境一致（pwsh 7 对原生命令
+        # stderr / 终止错误的处理不同，会导致同一脚本在 CI 上失败）。
+        shell: powershell
         run: |
-          # GitHub 托管的 pwsh 7 与本机 PS 5.1 行为不同：显式放开执行策略，
-          # 并把 PyInstaller 的 stderr 收进日志，避免被包装脚本误判为失败。
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
           $ErrorActionPreference = "Continue"
-          $PSNativeCommandUseErrorActionPreference = $false
           $log = Join-Path $env:RUNNER_TEMP "pet-build.log"
-          & ./scripts/publish-release.ps1 -Version "${{ github.ref_name }}" -Repo "${{ github.repository }}" *> $log
-          $code = $LASTEXITCODE
+          $code = 0
+          try {
+            & ./scripts/publish-release.ps1 -Version "${{ github.ref_name }}" -Repo "${{ github.repository }}" *> $log
+            $code = $LASTEXITCODE
+          } catch {
+            $code = 1
+            Add-Content -Path $log -Value ("EXCEPTION: " + $_.Exception.Message)
+            Add-Content -Path $log -Value ("AT: " + $_.InvocationInfo.PositionMessage)
+          }
           Get-Content $log -Tail 80
           if ($code -ne 0) {
             $errs = @(Get-Content $log | Where-Object {
-              $_ -match 'Exception|throw|cannot|not found|找不到|失败|error|错误'
+              $_ -match 'EXCEPTION|AT:|Exception|throw|cannot|not found|找不到|失败|error|错误'
             } | Select-Object -Last 6)
             foreach ($e in $errs) {
               $msg = ([string]$e) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'
-              Write-Host "::error::$msg"
+              Write-Output "::error::$msg"
             }
-            Write-Host "::error::发布脚本退出码 $code"
+            Write-Output "::error::发布脚本退出码 $code"
             exit $code
           }
 
