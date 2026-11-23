@@ -23,83 +23,26 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Verify tag matches version.json
-        shell: pwsh
-        run: |
-          $tag = ("${{ github.ref_name }}" -replace '^[vV]', '')
-          $v = (Get-Content version.json -Raw -Encoding UTF8 | ConvertFrom-Json).version
-          if ($tag -ne $v) { throw "tag $tag 与 version.json 的 $v 不一致，发版前请先改 version.json" }
-          Write-Host "版本校验通过: $v"
-
+      # 纯 Python 链路：与本机演练完全一致，不依赖 PowerShell 版本/执行策略。
+      # 脚本内部会校验 tag 与 version.json、发布包必备文件、空模板 state.json，
+      # 并把 zip 内 update.json 的 repo 写成正式更新源。
       - name: Build release package
-        # 用 Windows PowerShell 5.1：与本机演练环境一致（pwsh 7 对原生命令
-        # stderr / 终止错误的处理不同，会导致同一脚本在 CI 上失败）。
-        shell: powershell
+        shell: bash
         run: |
-          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-          $ErrorActionPreference = "Continue"
-          $log = Join-Path $env:RUNNER_TEMP "pet-build.log"
-          $code = 0
-          try {
-            & ./scripts/publish-release.ps1 -Version "${{ github.ref_name }}" -Repo "${{ github.repository }}" *> $log
-            $code = $LASTEXITCODE
-          } catch {
-            $code = 1
-            Add-Content -Path $log -Value ("EXCEPTION: " + $_.Exception.Message)
-            Add-Content -Path $log -Value ("AT: " + $_.InvocationInfo.PositionMessage)
-          }
-          Get-Content $log -Tail 80
-          if ($code -ne 0) {
-            $errs = @(Get-Content $log | Where-Object {
-              $_ -match 'EXCEPTION|AT:|Exception|throw|cannot|not found|找不到|失败|error|错误'
-            } | Select-Object -Last 6)
-            foreach ($e in $errs) {
-              $msg = ([string]$e) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A'
-              Write-Output "::error::$msg"
-            }
-            Write-Output "::error::发布脚本退出码 $code"
-            exit $code
-          }
-
-      - name: Verify package contents
-        shell: pwsh
-        run: |
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [System.IO.Compression.ZipFile]::OpenRead("publish/DesktopPet.zip")
-          try {
-            $names = @($zip.Entries | ForEach-Object { $_.FullName })
-            $required = @("小仓鼠桌宠.exe", "pet.py", "boat_fx.py", "updater.py",
-                          "version.json", "config.json", "pets.json", "state.json")
-            foreach ($f in $required) {
-              if ($names -notcontains $f) { throw "发布包缺少 $f" }
-            }
-            $sr = [System.IO.StreamReader]::new($zip.GetEntry("state.json").Open())
-            $state = $sr.ReadToEnd() | ConvertFrom-Json
-            $sr.Dispose()
-            if ($state.water -ne 0 -or $state.date -ne "") {
-              throw "state.json 不是空模板，可能把用户数据带进了公开仓库"
-            }
-            Write-Host "发布包校验通过：$($names.Count) 个文件，state.json 为干净模板"
-          } finally {
-            $zip.Dispose()
-          }
+          python scripts/publish_release.py \
+            --version "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
+        shell: bash
         run: |
-          $tag = "${{ github.ref_name }}"
-          $meta = Get-Content publish/latest.json -Raw -Encoding UTF8 | ConvertFrom-Json
-          $zip = Join-Path "publish" $meta.zip
-          if (-not (Test-Path $zip)) { throw "找不到 $zip" }
-          $ErrorActionPreference = "Continue"
-          gh release view $tag *> $null
-          $exists = ($LASTEXITCODE -eq 0)
-          $ErrorActionPreference = "Stop"
-          if ($exists) {
-            gh release upload $tag $zip publish/latest.json --clobber
-          } else {
-            gh release create $tag $zip publish/latest.json `
-              --title "小仓鼠桌宠 $($meta.version)" --notes $meta.notes
-          }
+          TAG="${{ github.ref_name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" publish/DesktopPet.zip publish/latest.json --clobber
+          else
+            gh release create "$TAG" publish/DesktopPet.zip publish/latest.json \
+              --title "DesktopPet $TAG" \
+              --notes-file publish/notes.txt
+          fi
