@@ -7,9 +7,10 @@ build.py — 把桌宠模板打包成可分发的成品（Windows .exe / Mac .ap
 
 流程：
     1. 检查 PyInstaller（没装则提示 pip install pyinstaller）
-    2. 打包 pet.py（--noconsole --onefile，assets/dialogues/config 内嵌一份兜底）
-    3. 组装交付目录：可执行文件 + 可编辑资源（assets/dialogues.txt/config.json/
-       使用说明.txt/源码 pet.py）——用户替换 exe 旁边的资源即可定制，不用重打包。
+    2. 打包 pet.py（--noconsole --onedir）。运行库是真实文件，启动时不再解压到临时目录。
+    3. Windows 上把这个目录放到 assets/_stage，根目录的 exe 只是一个很小的启动器。
+       已发布的 1.1.0 更新器只会整份覆盖 assets，运行库必须放在这里才能被带上。
+    4. 可编辑资源仍放在启动器旁边（assets 里的图片、dialogues、config、源码）。
 
 Mac 打包 .app 需要在 Mac 上执行（PyInstaller 不能跨平台打包）；
 在 Windows 上给 Mac 用户交付时，改交付 .command 启动脚本（见 SKILL.md）。
@@ -26,6 +27,38 @@ import sys
 EDITABLE = ["assets", "config.json", "pets.json", "使用说明.txt",
             "pet.py", "boat_fx.py", "updater.py",
             "version.json", "update.json", "README.md"]
+
+
+def find_csc():
+    """用系统自带的 .NET Framework 编译器，CI 不需要再装 dotnet SDK。"""
+    roots = (
+        os.environ.get("WINDIR") or r"C:\Windows",
+    )
+    names = (
+        os.path.join("Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe"),
+        os.path.join("Microsoft.NET", "Framework", "v4.0.30319", "csc.exe"),
+    )
+    for root in roots:
+        for rel in names:
+            path = os.path.join(root, rel)
+            if os.path.isfile(path):
+                return path
+    return None
+
+
+def compile_launcher(dest_exe):
+    csc = find_csc()
+    if not csc:
+        sys.exit("找不到 csc.exe，无法编译启动器")
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stage_launcher.cs")
+    if not os.path.isfile(src):
+        sys.exit("找不到 %s" % src)
+    cmd = [csc, "/nologo", "/target:winexe", "/optimize+",
+           "/r:System.Windows.Forms.dll", "/out:" + dest_exe, src]
+    print("编译启动器:", " ".join(cmd))
+    r = subprocess.run(cmd)
+    if r.returncode != 0 or not os.path.isfile(dest_exe):
+        sys.exit("启动器编译失败")
 
 
 def main():
@@ -56,7 +89,7 @@ def main():
     for p in dialogues:                 # 每个形象可以有自己的文案文件
         add += ["--add-data", p + sep + os.path.basename(p)]
 
-    cmd = [sys.executable, "-m", "PyInstaller", "--noconsole", "--onefile",
+    cmd = [sys.executable, "-m", "PyInstaller", "--noconsole", "--onedir",
            "--name", a.name, "--distpath", os.path.join(tpl, "_dist"),
            "--workpath", os.path.join(tpl, "_build"),
            "--specpath", os.path.join(tpl, "_spec")] + add + [pet_py]
@@ -69,16 +102,27 @@ def main():
     os.makedirs(out, exist_ok=True)
 
     exe_name = a.name + (".exe" if sys.platform.startswith("win") else "")
-    built = os.path.join(tpl, "_dist", exe_name)
-    if not os.path.exists(built):   # Mac .app
-        built = os.path.join(tpl, "_dist", a.name + ".app")
-    if not os.path.exists(built):
-        sys.exit("没找到打包产物，检查 _dist 目录")
-    if os.path.isdir(built):
-        shutil.copytree(built, os.path.join(out, os.path.basename(built)),
+    built_dir = os.path.join(tpl, "_dist", a.name)
+    built_file = os.path.join(tpl, "_dist", exe_name)
+    mac_app = os.path.join(tpl, "_dist", a.name + ".app")
+    if sys.platform.startswith("win"):
+        if not os.path.isdir(built_dir):
+            sys.exit("没找到目录版打包产物，检查 _dist 目录")
+        stage = os.path.join(out, "assets", "_stage")
+        if os.path.isdir(stage):
+            shutil.rmtree(stage)
+        shutil.copytree(built_dir, stage)
+        compile_launcher(os.path.join(out, exe_name))
+    elif os.path.isdir(mac_app):
+        shutil.copytree(mac_app, os.path.join(out, os.path.basename(mac_app)),
                         dirs_exist_ok=True)
+    elif os.path.isdir(built_dir):
+        shutil.copytree(built_dir, os.path.join(out, os.path.basename(built_dir)),
+                        dirs_exist_ok=True)
+    elif os.path.isfile(built_file):
+        shutil.copy2(built_file, os.path.join(out, exe_name))
     else:
-        shutil.copy2(built, os.path.join(out, exe_name))
+        sys.exit("没找到打包产物，检查 _dist 目录")
 
     # 可编辑资源放 exe 旁边（用户改这些就能定制，不用重打包）
     for item in EDITABLE + [os.path.basename(p) for p in dialogues]:

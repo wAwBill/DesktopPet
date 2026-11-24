@@ -89,11 +89,30 @@ def _geo_first(v):
     return str(v or "")
 
 # ---------------------------------------------------------------- 路径
-# 打包成 exe 后：可编辑资源（assets/dialogues/config）放在 exe 旁边；
+# 打包成 exe 后：可编辑资源（assets/dialogues/config）放在安装目录。
+# 真正的程序在 assets/_stage，根目录的 exe 只负责把它拉起来；
 # 源码运行时：放在 pet.py 旁边。BUNDLE_DIR 是 PyInstaller 内嵌资源的兜底。
+def install_base_dir(exe_dir):
+    """向上最多两级寻找 version.json。
+
+    目录版的 sys.executable 在 assets/_stage 里，用户数据仍在安装根目录。
+    运行库若已经和 version.json 放在同一层，就用那一层。
+    """
+    cur = os.path.abspath(exe_dir)
+    for _ in range(3):
+        if os.path.isfile(os.path.join(cur, "version.json")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    return os.path.abspath(exe_dir)
+
+
 if getattr(sys, "frozen", False):
-    BASE_DIR = os.path.dirname(sys.executable)
-    BUNDLE_DIR = getattr(sys, "_MEIPASS", BASE_DIR)
+    _EXE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    BASE_DIR = install_base_dir(_EXE_DIR)
+    BUNDLE_DIR = getattr(sys, "_MEIPASS", _EXE_DIR)
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     BUNDLE_DIR = BASE_DIR

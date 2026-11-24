@@ -114,6 +114,14 @@ def main():
     missing = [n for n in REQUIRED if not os.path.isfile(os.path.join(stage, n))]
     if missing:
         raise RuntimeError("发布目录缺少：%s" % ", ".join(missing))
+    internal = os.path.join(stage, "assets", "_stage", "_internal")
+    runtime = []
+    if os.path.isdir(internal):
+        runtime = [n for n in os.listdir(internal)
+                   if n.lower().startswith("python3") and n.lower().endswith(".dll")]
+    if not runtime:
+        raise RuntimeError("发布目录缺少 assets/_stage/_internal/python3.dll，"
+                           "目录版运行库没有打进去")
     st = read_json(os.path.join(stage, "state.json"))
     if st.get("water") != 0 or st.get("date") != "":
         raise RuntimeError("state.json 不是空模板，可能把用户数据带进公开仓库")

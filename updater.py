@@ -5,7 +5,8 @@ updater.py — 小仓鼠桌宠的自动更新器（纯逻辑，不依赖 tkinter
 设计参照 ChromeClick3.0 的 AppUpdate.cs，按桌宠的交付形态做了三处适配：
   1. 用户数据就在 exe 旁边：覆盖安装采用白名单，且对 pets.json 做合并，
      绝不整目录 xcopy 覆盖掉用户的组件开关 / 形象 / 面板位置 / 喝水记录。
-  2. 单文件 exe 运行中无法自我覆盖：生成 apply.cmd，等主进程退出后替换并重启。
+  2. 程序运行中无法覆盖自己的 exe 和运行库：生成 apply.cmd，等主进程退出后替换并重启。
+     运行库是目录里的真实文件（assets/_stage），启动时不再解压到临时目录。
   3. 国内直连 GitHub 常超时：清单与下载都走「代理优先 → 直连兜底」。
 
 典型调用（由 pet.py 在后台线程里驱动）：
@@ -60,7 +61,7 @@ MERGE_NAMES = ("pets.json",)
 REQUIRED_FILES = ("小仓鼠桌宠.exe", "pet.py", "version.json")
 
 MAX_UNCOMPRESSED = 400 * 1024 * 1024   # 防 zip bomb
-MAX_ENTRIES = 800
+MAX_ENTRIES = 8000                      # 目录版运行库文件很多，单文件时代的 800 不够
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
@@ -305,6 +306,8 @@ class Updater:
         self.extract_safely(zip_path, extract_dir)
         missing = [n for n in REQUIRED_FILES
                    if not os.path.isfile(os.path.join(extract_dir, n))]
+        if not self.runtime_present(extract_dir):
+            missing.append(r"assets\_stage\_internal\python3.dll")
         if missing:
             raise UpdateError("更新包不完整，缺少：%s" % "、".join(missing))
         progress(100, "更新包已就绪")
@@ -355,14 +358,30 @@ class Updater:
         return out
 
     @staticmethod
+    def runtime_present(extract_dir):
+        """目录版运行库：python3xx.dll 必须在 assets/_stage/_internal 里。"""
+        internal = os.path.join(extract_dir, "assets", "_stage", "_internal")
+        try:
+            names = os.listdir(internal)
+        except OSError:
+            return False
+        return any(n.lower().startswith("python3") and n.lower().endswith(".dll")
+                   for n in names)
+
+    @staticmethod
     def _should_overwrite(rel):
         parts = rel.replace("\\", "/").split("/")
         name = parts[-1]
         if name in OVERWRITE_NAMES:
             return True
-        if len(parts) > 1 and parts[0].lower() == "assets":
+        # assets 含形象图，也含 _stage 里的目录版运行库。
+        # 已发布的 1.1.0 只会整份覆盖 assets，所以运行库不能放到别处。
+        if len(parts) > 1 and parts[0].lower() in ("assets", "_internal"):
             return True
         if name.startswith("dialogues") and name.endswith(".txt"):
+            return True
+        # 运行库直接放在 exe 旁边时（与 ChromeClick 的 dll 同级）一并覆盖
+        if len(parts) == 1 and name.lower().endswith((".dll", ".pyd", ".zip")):
             return True
         return False
 

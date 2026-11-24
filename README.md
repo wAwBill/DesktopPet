@@ -1,6 +1,6 @@
 # 小仓鼠桌宠
 
-基于 Python 3.12 + tkinter + Pillow 的 Windows 透明置顶桌宠，用 PyInstaller 打成单文件 exe。
+基于 Python 3.12 + tkinter + Pillow 的 Windows 透明置顶桌宠，用 PyInstaller 打成目录版程序。
 支持多形象切换（小仓鼠 / 罗小黑 / 3D 版 / 划船巡逻）、程序化动画、独立信息面板、
 16 个可开关趣味组件，以及基于 GitHub Release 的自动更新。
 
@@ -49,7 +49,9 @@ python scripts/build.py . --name 小仓鼠桌宠 --out ../dist_小仓鼠桌宠
 - **用户数据在安装目录内**：`config.json` / `state.json` / `pets.json` 就在 exe 旁边，
   不能整目录 `xcopy`。更新器采用**白名单覆盖**，且会对 `pets.json` 做合并：
   保留用户 `active` 与自定义形象，追加新版新增形象。
-- **单文件 exe 运行中无法自覆盖**：由 `apply.cmd` 等待主进程退出后替换并重启。
+- **运行中的 exe 和运行库无法自覆盖**：由 `apply.cmd` 等待主进程退出后替换并重启。
+  运行库在 `assets/_stage`，是磁盘上的真实文件，启动时不再解压到临时目录。
+  放在 `assets` 下，是为了让已经发出去的 1.1.0 更新器（只会整份覆盖 `assets`）也能把运行库带上。
 - **zip 里是干净模板**：发布脚本从源码模板生成 `config.json` / `state.json`，
   不会把本机用户设置上传到公开仓库。
 
@@ -57,7 +59,7 @@ python scripts/build.py . --name 小仓鼠桌宠 --out ../dist_小仓鼠桌宠
 
 | 处理 | 文件 |
 | --- | --- |
-| 覆盖 | `小仓鼠桌宠.exe`、`pet.py`、`boat_fx.py`、`updater.py`、`version.json`、`使用说明.txt`、`assets/*`、`dialogues*.txt` |
+| 覆盖 | `小仓鼠桌宠.exe`、`pet.py`、`boat_fx.py`、`updater.py`、`version.json`、`使用说明.txt`、`assets/**`（含 `_stage` 运行库）、`dialogues*.txt` |
 | 合并 | `pets.json` |
 | 保留 | `config.json`（新字段由程序补默认值）、`state.json`、`update.json` |
 

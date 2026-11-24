@@ -113,6 +113,9 @@ def base_zip_bytes():
             "pets": [{"id": "hamster", "name": "小仓鼠", "image": "assets/pet.png"},
                      {"id": "new_pet", "name": "新形象", "image": "assets/new.png"}],
         }, ensure_ascii=False),
+        "assets/_stage/小仓鼠桌宠.exe": b"MZ-staged",
+        "assets/_stage/_internal/python312.dll": b"MZ-runtime",
+        "assets/_stage/_internal/PIL/_imaging.pyd": b"pyd",
         "private_notes.txt": "should not be installed",
     })
 
@@ -161,7 +164,7 @@ def main():
         check("默认 update.json 的 repo 为空（跳过检查）",
               settings.get("repo") == "" and settings.get("enabled") is True)
         check("version.json 是唯一版本源",
-              up_mod.load_version(tmp) == "1.1.0",
+              up_mod.load_version(tmp) == "1.1.1",
               up_mod.load_version(tmp))
         up0 = up_mod.Updater(tmp, repo="", local_version="1.0.0")
         check("repo 为空时 manifest_url 为 None",
@@ -250,7 +253,8 @@ def main():
         extract = up.download(got, lambda p, t: progress.append((p, t)))
         check("下载并解压出必备文件",
               all(os.path.isfile(os.path.join(extract, n))
-                  for n in up_mod.REQUIRED_FILES))
+                  for n in up_mod.REQUIRED_FILES)
+              and up_mod.Updater.runtime_present(extract))
         check("下载进度回调被触发且到 100",
               any(p == 100 for p, _t in progress) and len(progress) >= 2,
               "%d 次回调" % len(progress))
@@ -307,6 +311,10 @@ def main():
               EXE in pnames and "pet.py" in pnames and "updater.py" in pnames)
         check("payload 含 assets 与文案",
               "assets/pet.png" in pnames and "dialogues.txt" in pnames)
+        check("payload 含目录版运行库",
+              "assets/_stage/_internal/python312.dll" in pnames
+              and "assets/_stage/_internal/PIL/_imaging.pyd" in pnames
+              and "assets/_stage/小仓鼠桌宠.exe" in pnames)
         for name in ("config.json", "state.json", "update.json"):
             check("用户数据不进 payload：%s" % name, name not in pnames)
         check("非白名单文件不进 payload",
@@ -331,6 +339,22 @@ def main():
         st = json.load(open(os.path.join(payload2, "state.json"), encoding="utf-8"))
         check("全新安装 state.json 是空模板", st.get("water") == 0)
 
+        layout = os.path.join(tmp, "layout")
+        stage_dir = os.path.join(layout, "assets", "_stage")
+        os.makedirs(stage_dir)
+        with open(os.path.join(layout, "version.json"), "w", encoding="utf-8") as f:
+            f.write("{}")
+        flat = os.path.join(tmp, "flat")
+        os.makedirs(flat)
+        with open(os.path.join(flat, "version.json"), "w", encoding="utf-8") as f:
+            f.write("{}")
+        check("运行库在 assets/_stage 时用户目录仍是安装根",
+              os.path.normcase(pet_mod.install_base_dir(stage_dir))
+              == os.path.normcase(layout))
+        check("运行库与 version.json 同级时用户目录就是该目录",
+              os.path.normcase(pet_mod.install_base_dir(flat))
+              == os.path.normcase(flat))
+
         # ---------------- apply.cmd
         launched = []
         up_mod.subprocess.Popen = lambda *a, **k: launched.append((a, k)) or object()
@@ -353,10 +377,10 @@ def main():
         app.say = lambda text, *a, **k: said.append(text)
         labels = menu_labels(app.menu)
         check("菜单含「检查更新（当前版本）」",
-              any(s.startswith("检查更新（当前 v1.1.0）") for s in labels),
+              any(s.startswith("检查更新（当前 v1.1.1）") for s in labels),
               next((s for s in labels if s.startswith("检查更新")), ""))
         check("实例已加载版本号与更新器",
-              app.app_version == "1.1.0" and app._updater is not None)
+              app.app_version == "1.1.1" and app._updater is not None)
         check("未配置 repo 时手动检查只提示、不联网",
               (app._manual_update_check() or True)
               and any("尚未配置更新仓库" in s for s in said), str(said[-1:]))

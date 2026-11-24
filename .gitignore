@@ -7,6 +7,7 @@ _build/
 _spec/
 build/
 dist/
+dist_小仓鼠桌宠/
 publish/
 *.spec
 *.zip
